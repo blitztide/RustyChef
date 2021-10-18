@@ -3,6 +3,7 @@
 use std::io::{self, Read};
 use sqlite::*;
 use std::env;
+use clap::{Arg, App, SubCommand};
 
 // Static Definitions
 static URI: &str = "http://192.168.100.152:3000/bake";
@@ -35,7 +36,9 @@ fn trim_newline(s: &mut String) -> String {
 }
 
 fn init_db(s: &str) -> Result<sqlite::Connection> {
+
     let conn = sqlite::open(s).unwrap();
+    
     // Create tables if not exist
     conn.execute(
         "create table if not exists recipes (
@@ -52,11 +55,15 @@ fn init_db(s: &str) -> Result<sqlite::Connection> {
         ).unwrap();
 
     conn.execute(
-        r#"INSERT OR IGNORE INTO recipes VALUES (1,'[{"op":"To Base64","args":["A-Za-z0-9+/="]}]','string')"#
+        r#"INSERT OR IGNORE INTO recipes VALUES (1,
+        '[{"op":"To Base64","args":["A-Za-z0-9+/="]}]',
+        'string')"#
         ).unwrap();
 
     conn.execute(
-        r#"INSERT OR IGNORE INTO servers VALUES (1,'HTTP','localhost:3000')"#
+        r#"INSERT OR IGNORE INTO servers VALUES (1,
+        'HTTP',
+        'localhost:3000')"#
             ).unwrap();
 
     Ok(conn)
@@ -91,6 +98,21 @@ fn get_server(conn: sqlite::Connection, id: i64) -> Result<String> {
 
 fn main() -> io::Result<()> {
 
+    // Initialise Argument Parser
+    let matches = App::new("RustyChef")
+        .version("0.1")
+        .author("Blitztide")
+        .about("CLI for CyberChef-server")
+        .arg(Arg::new("recipe")
+             .short('r')
+             .long("recipe")
+             .takes_value(true)
+             .help("Selects recipe by ID"))
+        .get_matches();
+
+    // Gets recipe id from arguments
+    let recipe_id = matches.value_of("recipe").unwrap_or("1");
+
     // Get home directory from ENV
     let home_dir = env::var("HOME").unwrap();
     // Set database location to ~/.rustychef/rustychef.db
@@ -102,7 +124,7 @@ fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
 
-    let recipe = get_recipe(conn, 2).unwrap();
+    let recipe = get_recipe(conn, recipe_id.parse::<i64>().unwrap()).unwrap();
     let request = format!(r#"{{"input":"{}",{}}}"#,trim_newline(&mut buffer),recipe);
     // Printing request to stdout
     
