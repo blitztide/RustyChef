@@ -1,9 +1,9 @@
 
 // Rust Imports
-use std::io::{self, Read, Error, ErrorKind};
+use std::io::{self, Read, ErrorKind};
 use sqlite::*;
 use std::env;
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 
 // Static Definitions
 static DATABASE: &str = "/.rustychef/rustychef.db";
@@ -94,12 +94,20 @@ fn main() -> io::Result<()> {
              .short('r')
              .long("recipe")
              .takes_value(true)
-             .help("Selects recipe by ID"))
+             .about("Selects recipe by ID"))
         .arg(Arg::new("server")
              .short('s')
              .long("server")
              .takes_value(true)
-             .help("Selects server by ID"))
+             .about("Selects server by ID"))
+        .arg(Arg::new("edit")
+             .short('e')
+             .long("edit")
+             .takes_value(true)
+             .about("Edits the current database"))
+        .arg(Arg::new("input")
+             .takes_value(true)
+             .about("The input value for cyberchef"))
         .get_matches();
 
     // Gets recipe id from arguments defaults to 1 as i64
@@ -116,9 +124,15 @@ fn main() -> io::Result<()> {
     // Open Connection to database and initialise
     let conn = init_db(db.as_str()).unwrap();
 
-    // Read StdIn to buffer as a String
+    // Create a buffer for input
     let mut buffer = String::new();
-    io::stdin().read_to_string(&mut buffer)?;
+    
+    // Checks if input is provided as an argument if not, default to stdin
+    if matches.is_present("input") {
+        buffer = matches.value_of("input").unwrap().to_string();
+    } else {
+        io::stdin().read_to_string(&mut buffer)?;
+    }
 
     // Collect recipe from database
     let recipe = get_recipe(&conn, recipe_id).unwrap();

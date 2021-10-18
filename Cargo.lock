@@ -3,16 +3,6 @@
 version = 3
 
 [[package]]
-name = "RustyChef"
-version = "0.1.0"
-dependencies = [
- "clap",
- "json",
- "reqwest",
- "sqlite",
-]
-
-[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -683,6 +673,16 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
+]
+
+[[package]]
+name = "rusty_chef"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "json",
+ "reqwest",
+ "sqlite",
 ]
 
 [[package]]
