@@ -9,22 +9,7 @@ use clap::{Arg, App, SubCommand};
 static URI: &str = "http://192.168.100.152:3000/bake";
 static DATABASE: &str = "/.rustychef/rustychef.db";
 
-// Example requests
-
-
-/* Example POST request:
-Connection from 127.0.0.1:37292
-POST /bake HTTP/1.1
-Host: localhost:3333
-User-Agent: curl/7.79.1
-Accept: 
-Content-Type:application/json
-Content-Length: 196
-
-{"input":"... ---:.-.. --- -. --. --..--:.- -. -..:- .... .- -. -.- ...:..-. --- .-.:.- .-.. .-..:- .... .:..-. .. ... ....", "recipe":{"op":"from morse code", "args": {"wordDelimiter": "Colon"}}}
-
-*/
-
+// Trim newline characters for buffer input
 fn trim_newline(s: &mut String) -> String {
     if s.ends_with('\n') {
         s.pop();
@@ -35,6 +20,7 @@ fn trim_newline(s: &mut String) -> String {
     s.to_string()
 }
 
+// Initialise database, will not modify if exists
 fn init_db(s: &str) -> Result<sqlite::Connection> {
 
     let conn = sqlite::open(s).unwrap();
@@ -69,6 +55,7 @@ fn init_db(s: &str) -> Result<sqlite::Connection> {
     Ok(conn)
 }
 
+// Collect recipe by ID
 fn get_recipe(conn: sqlite::Connection, id: i64) -> Result<String> {
 
     let mut cursor = conn.prepare("SELECT recipe,return FROM recipes WHERE ID=? LIMIT 1").unwrap().into_cursor();
@@ -82,6 +69,8 @@ fn get_recipe(conn: sqlite::Connection, id: i64) -> Result<String> {
     Ok(return_val) 
 }
 
+
+// Get Server by ID
 fn get_server(conn: sqlite::Connection, id: i64) -> Result<String> {
 
     let mut cursor = conn.prepare("SELECT protocol,uri FROM recipes WHERE ID=? LIMIT 1").unwrap().into_cursor();
