@@ -1,12 +1,11 @@
 
 // Rust Imports
-use std::io::{self, Read};
+use std::io::{self, Read, Error, ErrorKind};
 use sqlite::*;
 use std::env;
 use clap::{Arg, App, SubCommand};
 
 // Static Definitions
-static URI: &str = "http://192.168.100.152:3000/bake";
 static DATABASE: &str = "/.rustychef/rustychef.db";
 
 // Trim newline characters for buffer input
@@ -29,6 +28,7 @@ fn init_db(s: &str) -> Result<sqlite::Connection> {
     conn.execute(
         "create table if not exists recipes (
             id integer primary key,
+            name text not null,
             recipe text not null,
             return text)",
         ).unwrap();
@@ -36,27 +36,28 @@ fn init_db(s: &str) -> Result<sqlite::Connection> {
     conn.execute(
         "create table if not exists servers (
             id integer primary key,
-            protocol text not null,
-            url text not null)",
+            name text not null,
+            uri text not null)",
         ).unwrap();
 
     conn.execute(
         r#"INSERT OR IGNORE INTO recipes VALUES (1,
+        'Base64',
         '[{"op":"To Base64","args":["A-Za-z0-9+/="]}]',
         'string')"#
         ).unwrap();
 
     conn.execute(
         r#"INSERT OR IGNORE INTO servers VALUES (1,
-        'HTTP',
-        'localhost:3000')"#
+        'local',
+        'http://localhost:3000/bake')"#
             ).unwrap();
 
     Ok(conn)
 }
 
 // Collect recipe by ID
-fn get_recipe(conn: sqlite::Connection, id: i64) -> Result<String> {
+fn get_recipe(conn: &sqlite::Connection, id: i64) -> Result<String> {
 
     let mut cursor = conn.prepare("SELECT recipe,return FROM recipes WHERE ID=? LIMIT 1").unwrap().into_cursor();
     cursor.bind(&[Value::Integer(id)]).unwrap();
@@ -71,16 +72,13 @@ fn get_recipe(conn: sqlite::Connection, id: i64) -> Result<String> {
 
 
 // Get Server by ID
-fn get_server(conn: sqlite::Connection, id: i64) -> Result<String> {
+fn get_server(conn: &sqlite::Connection, id: i64) -> Result<String> {
 
-    let mut cursor = conn.prepare("SELECT protocol,uri FROM recipes WHERE ID=? LIMIT 1").unwrap().into_cursor();
+    let mut cursor = conn.prepare("SELECT uri FROM servers WHERE ID=? LIMIT 1").unwrap().into_cursor();
     cursor.bind(&[Value::Integer(id)]).unwrap();
 
     let row = cursor.next().unwrap().unwrap();
-    let return_val = format!(r#""recipe":{},"outputType":"{}""#,
-                             row[0].as_string().unwrap(),
-                             row[1].as_string().unwrap()
-                             );
+    let return_val = format!("{}",row[0].as_string().unwrap());
     Ok(return_val) 
 }
 
@@ -97,10 +95,18 @@ fn main() -> io::Result<()> {
              .long("recipe")
              .takes_value(true)
              .help("Selects recipe by ID"))
+        .arg(Arg::new("server")
+             .short('s')
+             .long("server")
+             .takes_value(true)
+             .help("Selects server by ID"))
         .get_matches();
 
-    // Gets recipe id from arguments
-    let recipe_id = matches.value_of("recipe").unwrap_or("1");
+    // Gets recipe id from arguments defaults to 1 as i64
+    let recipe_id = matches.value_of("recipe").unwrap_or("1").parse::<i64>().unwrap();
+
+    // Gets server id from arguments defaults to 1 as i64
+    let server_id = matches.value_of("server").unwrap_or("1").parse::<i64>().unwrap();
 
     // Get home directory from ENV
     let home_dir = env::var("HOME").unwrap();
@@ -109,21 +115,35 @@ fn main() -> io::Result<()> {
 
     // Open Connection to database and initialise
     let conn = init_db(db.as_str()).unwrap();
+
     // Read StdIn to buffer as a String
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
 
-    let recipe = get_recipe(conn, recipe_id.parse::<i64>().unwrap()).unwrap();
+    // Collect recipe from database
+    let recipe = get_recipe(&conn, recipe_id).unwrap();
+
+    // Collect server from database
+    let server = get_server(&conn, server_id).unwrap();
+
+    // Read clean stdin buffer and format for cyberchef
     let request = format!(r#"{{"input":"{}",{}}}"#,trim_newline(&mut buffer),recipe);
-    // Printing request to stdout
-    
+   
+    // Creating POST request
     let client = reqwest::blocking::Client::new();
-    let response = client.post(URI)
+    let response = client.post(server)
         .header("User-Agent", "RustyChef")
         .header("Content-Type", "application/json")
         .body(request)
         .send()
         .unwrap();
-    println!("{}",response.text().unwrap());
-    Ok(())
+
+    if response.status().is_success() {
+        let result = json::parse(&response.text().unwrap()).unwrap();
+        println!("{}",result["value"]);
+        Ok(())
+    } else {
+        let error = std::io::Error::new(ErrorKind::Other, "Failed Request");
+        Err(error)
+    }
 }
