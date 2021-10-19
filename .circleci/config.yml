@@ -4,4 +4,5 @@ jobs:
       - image: cimg/rust:1.55.0
     steps:
       - checkout
+      - run: apt install openssl
       - run: cargo build --release
