@@ -4,4 +4,4 @@ jobs:
       - image: cimg/rust:1.55.0
     steps:
       - checkout
-      - run: cargo --version
+      - run: cargo build --release
