@@ -4,5 +4,5 @@ jobs:
       - image: cimg/rust:1.55.0
     steps:
       - checkout
-      - run: sudo apt install libssl-dev
+      - run: sudo apt update && sudo apt install libssl-dev
       - run: cargo build --release
